@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF to Audio Translation</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+        }
+        .container {
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            width: 300px;
+            text-align: center;
+        }
+        h1 {
+            font-size: 24px;
+            margin-bottom: 20px;
+            color: #333;
+        }
+        input[type="file"] {
+            margin: 20px 0;
+        }
+        button {
+            background-color: #28a745;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #218838;
+        }
+        .progress {
+            margin-top: 20px;
+            font-size: 16px;
+            margin: 5px;
+        }
+        .audio-link {
+            margin-top: 20px;
+            display: none;
+        }
+        .audio-link a {
+            color: #007bff;
+            text-decoration: none;
+            font-size: 16px;
+        }
+        .audio-link a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Upload PDF for Translation</h1>
+        <form id="upload-form">
+            <input type="file" id="file-input" name="file" accept=".pdf" required>
+            <br>
+            <button type="submit">Upload and Translate</button>
+        </form>
+        <div id="progress" style="padding: 10px !important;">
+            <p>Status: <span id="status">Not Started</span></p>
+            <p style=" margin: 5px;">Progress: <span id="progress">0%</span></p>
+        </div>
+        <div class="audio-link" id="audio-link" style="display: none;">
+            <p>Download the translated audio:</p>
+            <a id="download-link" href="#" download>Download MP3</a>
+        </div>
+    </div>
+
+    <script>
+        const form = document.getElementById('upload-form');
+        const fileInput = document.getElementById('file-input');
+        const statusSpan = document.getElementById('status');
+        const progressSpan = document.getElementById('progress');
+        const audioLinkDiv = document.getElementById('audio-link');
+        const downloadLink = document.getElementById('download-link');
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const formData = new FormData();
+            formData.append('file', fileInput.files[0]);
+
+            try {
+                const response = await fetch('/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (response.ok) {
+                    const { task_id } = await response.json();
+                    const checkProgress = async () => {
+                        const progressResponse = await fetch(`/progress/${task_id}`);
+                        if (progressResponse.ok) {
+                            const data = await progressResponse.json();
+                            statusSpan.textContent = data.status;
+                            progressSpan.textContent = `${data.percentage}%`;
+
+                            if (data.status === 'Completed') {
+                                const downloadUrl = `/download/${task_id}`;
+                                downloadLink.href = downloadUrl;
+                                audioLinkDiv.style.display = 'block';
+                            } else if (data.status === 'Failed') {
+                                alert('Translation failed.');
+                            } else {
+                                setTimeout(checkProgress, 1000);
+                            }
+                        } else {
+                            alert('Progress check failed.');
+                        }
+                    };
+                    checkProgress();
+                } else {
+                    alert('Failed to upload and translate the PDF.');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('An error occurred while processing the file.');
+            }
+        });
+    </script>
+</body>
+</html>
