@@ -8,10 +8,10 @@ import tempfile
 import uuid
 from threading import Thread
 
-
+# Load environment variables
 load_dotenv()
 
-
+# Configure Generative AI model
 genai.configure(api_key=os.environ["API_KEY"])
 generation_config = {
     "temperature": 1,
@@ -39,18 +39,18 @@ def extract_text_from_pdf(file_path: str):
                 text += page_text
     return text
 
-def translate_text(text: str, task_id: str):
+def translate_text(text: str, language: str, task_id: str):
     progress[task_id] = {'status': 'Translating', 'percentage': 0}
-    response = model.generate_content(f"translate to arabic {text}", stream=False)
+    response = model.generate_content(f"translate to {language} {text}", stream=False)
     translated_text = "".join(res.text for res in response)
     progress[task_id]['status'] = 'Translating Complete'
     progress[task_id]['percentage'] = 50
     print(f"Translation completed for task {task_id}")
     return translated_text.replace("#","").replace("*","")
 
-def text_to_speech(text: str, task_id: str) -> str:
+def text_to_speech(text: str, language: str, task_id: str) -> str:
     progress[task_id] = {'status': 'Converting to Speech', 'percentage': 50}
-    tts = gTTS(text, lang='ar')
+    tts = gTTS(text, lang=language)
     audio_file = tempfile.NamedTemporaryFile(delete=False, suffix=".mp3")
     tts.save(audio_file.name)
     final_audio_path = f"/tmp/{task_id}.mp3"
@@ -67,10 +67,11 @@ def index():
 
 @app.route('/upload', methods=['POST'])
 def upload_file():
-    if 'file' not in request.files:
-        return jsonify({"error": "No file part"}), 400
+    if 'file' not in request.files or 'language' not in request.form:
+        return jsonify({"error": "File or language selection missing"}), 400
 
     file = request.files['file']
+    language = request.form['language']
     if file.filename == '':
         return jsonify({"error": "No selected file"}), 400
 
@@ -84,8 +85,9 @@ def upload_file():
 
         def process():
             try:
-                translated_text = translate_text(text, task_id)
-                audio_file_path = text_to_speech(translated_text, task_id)
+                translated_text = translate_text(text, language, task_id)
+                print(translated_text)
+                audio_file_path = text_to_speech(translated_text, language, task_id)
                 print(f"Processing completed for task {task_id}")
             except Exception as e:
                 print(f"Error during processing: {e}")
@@ -107,4 +109,4 @@ def download_file(task_id):
     return jsonify({"error": "File not found"}), 404
 
 if __name__ == "__main__":
-    app.run(port=8000,debug=True)
+    app.run(port=8000, debug=True)
